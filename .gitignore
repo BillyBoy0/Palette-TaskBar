@@ -1,0 +1,5 @@
+# Exe compilé par build.bat : distribué dans les Releases, pas dans le code
+*.exe
+
+# Palettes personnelles (anciennes versions, rangées à côté de l'exe)
+palettes.json
