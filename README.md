@@ -22,26 +22,26 @@ Windows 11. Rien d'autre à installer.
 
 ### Installation
 
-1. Téléchargez `PaletteBarre.exe` dans la [dernière version](../../releases/latest).
-2. Rangez-le dans un dossier où il restera (par exemple `Documents\PaletteBarre`), puis lancez-le.
+1. Téléchargez `Palette-TaskBar.exe` dans la [dernière version](../../releases/latest).
+2. Rangez-le dans un dossier où il restera (par exemple `Documents\Palette-TaskBar`), puis lancez-le.
 3. Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur », car le programme n'est pas signé numériquement. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
-4. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez PaletteBarre.
+4. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez Palette-TaskBar.
 
 ### Utilisation
 
 - Clic droit sur un rond → **Gérer les palettes…** pour créer vos palettes.
 - Un champ vide n'affiche pas de rond.
 - **Enregistrer et afficher** enregistre toutes les palettes et affiche celle qui est sélectionnée.
-- Vos palettes sont enregistrées dans `%APPDATA%\PaletteBarre\palettes.json`. Vous pouvez modifier ce fichier à la main quand le programme est fermé.
+- Vos palettes sont enregistrées dans `%APPDATA%\Palette-TaskBar\palettes.json`. Vous pouvez modifier ce fichier à la main quand le programme est fermé.
 
 ### Compiler soi-même
 
-Tout le programme tient dans `PaletteBarre.cs`. Double-cliquez sur `build.bat` : il utilise le compilateur C# fourni avec Windows (.NET Framework 4), aucun outil à installer. `build.bat` ferme PaletteBarre s'il est ouvert, pour pouvoir remplacer l'exe.
+Tout le programme tient dans `Palette-TaskBar.cs`. Double-cliquez sur `build.bat` : il utilise le compilateur C# fourni avec Windows (.NET Framework 4), aucun outil à installer. `build.bat` ferme Palette-TaskBar s'il est ouvert, pour pouvoir remplacer l'exe.
 
 ### Désinstaller
 
 1. Clic droit sur un rond : décochez **Lancer au démarrage de Windows**, puis **Quitter**.
-2. Supprimez `PaletteBarre.exe` et le dossier `%APPDATA%\PaletteBarre`.
+2. Supprimez `Palette-TaskBar.exe` et le dossier `%APPDATA%\Palette-TaskBar`.
 
 ### Licence
 
@@ -66,26 +66,26 @@ Windows 11. Nothing else to install.
 
 ### Installation
 
-1. Download `PaletteBarre.exe` from the [latest release](../../releases/latest).
-2. Put it in a folder where it will stay (for example `Documents\PaletteBarre`), then run it.
+1. Download `Palette-TaskBar.exe` from the [latest release](../../releases/latest).
+2. Put it in a folder where it will stay (for example `Documents\Palette-TaskBar`), then run it.
 3. On first launch, Windows may show "Windows protected your PC" because the program is not digitally signed. Click **More info**, then **Run anyway**.
-4. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn PaletteBarre on.
+4. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn Palette-TaskBar on.
 
 ### Usage
 
 - Right-click a dot → **Gérer les palettes…** (Manage palettes) to create your palettes.
 - An empty field shows no dot.
 - **Enregistrer et afficher** (Save and show) saves all palettes and shows the selected one.
-- Your palettes are stored in `%APPDATA%\PaletteBarre\palettes.json`. You can edit this file by hand while the program is closed.
+- Your palettes are stored in `%APPDATA%\Palette-TaskBar\palettes.json`. You can edit this file by hand while the program is closed.
 
 ### Build it yourself
 
-The whole program is `PaletteBarre.cs`. Double-click `build.bat`: it uses the C# compiler that ships with Windows (.NET Framework 4), no tools to install. `build.bat` closes PaletteBarre if it is running, so the exe can be replaced.
+The whole program is `Palette-TaskBar.cs`. Double-click `build.bat`: it uses the C# compiler that ships with Windows (.NET Framework 4), no tools to install. `build.bat` closes Palette-TaskBar if it is running, so the exe can be replaced.
 
 ### Uninstall
 
 1. Right-click a dot: uncheck **Lancer au démarrage de Windows** (Start with Windows), then **Quitter** (Quit).
-2. Delete `PaletteBarre.exe` and the `%APPDATA%\PaletteBarre` folder.
+2. Delete `Palette-TaskBar.exe` and the `%APPDATA%\Palette-TaskBar` folder.
 
 ### License
 

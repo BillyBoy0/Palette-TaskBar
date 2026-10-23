@@ -1,4 +1,4 @@
-// PaletteBarre : jusqu'à 6 ronds de couleur dans la zone de notification.
+// Palette-TaskBar : jusqu'à 6 ronds de couleur dans la zone de notification.
 // Clic gauche = copie le code hex, clic droit = changer de palette / gérer les palettes.
 // Compiler avec build.bat (compilateur C# fourni avec Windows, C# 5).
 
@@ -16,12 +16,12 @@ using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
 
-[assembly: AssemblyTitle("PaletteBarre")]
-[assembly: AssemblyProduct("PaletteBarre")]
+[assembly: AssemblyTitle("Palette-TaskBar")]
+[assembly: AssemblyProduct("Palette-TaskBar")]
 [assembly: AssemblyDescription("Palettes de couleurs dans la barre des tâches")]
 [assembly: AssemblyVersion("1.0.0.0")]
 
-namespace PaletteBarre
+namespace PaletteTaskBar
 {
     static class Program
     {
@@ -32,13 +32,13 @@ namespace PaletteBarre
         static void Main()
         {
             bool first;
-            using (Mutex mutex = new Mutex(true, "PaletteBarre_UneSeuleInstance", out first))
+            using (Mutex mutex = new Mutex(true, "Palette-TaskBar_UneSeuleInstance", out first))
             {
                 if (!first) return;
                 if (!IsWindows11())
                 {
-                    MessageBox.Show("PaletteBarre nécessite Windows 11.\nPaletteBarre requires Windows 11.",
-                        "PaletteBarre", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Palette-TaskBar nécessite Windows 11.\nPalette-TaskBar requires Windows 11.",
+                        "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
                 try { SetProcessDPIAware(); } catch (Exception) { }
@@ -87,18 +87,24 @@ namespace PaletteBarre
 
     static class Store
     {
-        static readonly string Folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PaletteBarre");
+        static readonly string AppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        static readonly string Folder = Path.Combine(AppData, "Palette-TaskBar");
         public static readonly string FilePath = Path.Combine(Folder, "palettes.json");
-        // Les premières versions rangeaient le fichier à côté de l'exe : il est repris une fois.
-        static readonly string OldPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "palettes.json");
+        // Emplacements des premières versions (nommées PaletteBarre) : le fichier est repris une fois.
+        static readonly string[] OldPaths =
+        {
+            Path.Combine(Path.Combine(AppData, "PaletteBarre"), "palettes.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "palettes.json")
+        };
 
         public static Config Load()
         {
             Directory.CreateDirectory(Folder);
-            if (!File.Exists(FilePath) && File.Exists(OldPath))
+            foreach (string old in OldPaths)
             {
-                File.Copy(OldPath, FilePath);
-                try { File.Delete(OldPath); } catch (Exception) { }
+                if (File.Exists(FilePath) || !File.Exists(old)) continue;
+                File.Copy(old, FilePath);
+                try { File.Delete(old); } catch (Exception) { }
             }
 
             if (File.Exists(FilePath))
@@ -116,7 +122,7 @@ namespace PaletteBarre
                 {
                     // Fichier abîmé : on ne l'écrase pas, on travaille avec l'exemple en mémoire.
                     MessageBox.Show("palettes.json est illisible, la palette d'exemple est utilisée en attendant.\n\n" + ex.Message,
-                        "PaletteBarre", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return Example();
                 }
             }
@@ -288,7 +294,7 @@ namespace PaletteBarre
     static class Startup
     {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string ValueName = "PaletteBarre";
+        const string ValueName = "Palette-TaskBar";
 
         public static bool IsEnabled()
         {
@@ -359,7 +365,7 @@ namespace PaletteBarre
             for (int i = Slots - 1; i >= 0; i--)
             {
                 SetIcon(i, Icons.Empty());
-                tray[i].Text = "PaletteBarre";
+                tray[i].Text = "Palette-TaskBar";
                 tray[i].Visible = true;
             }
             startTimer.Interval = 1000;
