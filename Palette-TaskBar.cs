@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -19,7 +20,10 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Palette-TaskBar")]
 [assembly: AssemblyProduct("Palette-TaskBar")]
 [assembly: AssemblyDescription("Palettes de couleurs dans la barre des tâches")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyCompany("Cyril Neau")]
+[assembly: AssemblyCopyright("© 2026 Cyril Neau")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 namespace PaletteTaskBar
 {
@@ -28,22 +32,35 @@ namespace PaletteTaskBar
         [DllImport("user32.dll")]
         static extern bool SetProcessDPIAware();
 
+        [DllImport("user32.dll")]
+        static extern bool AllowSetForegroundWindow(int processId);
+
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            bool first;
-            using (Mutex mutex = new Mutex(true, "Palette-TaskBar_UneSeuleInstance", out first))
+            try { SetProcessDPIAware(); } catch (Exception) { }
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            if (!IsWindows11())
             {
-                if (!first) return;
-                if (!IsWindows11())
+                MessageBox.Show("Palette-TaskBar nécessite Windows 11.\nPalette-TaskBar requires Windows 11.",
+                    "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (args.Length > 0 && args[0] == "/uninstall") { Installer.Uninstall(); return; }
+            if (!Installer.IsInstalledCopy()) { Installer.Install(); return; }
+
+            bool first;
+            using (Mutex mutex = new Mutex(true, Signals.MutexName, out first))
+            {
+                if (!first)
                 {
-                    MessageBox.Show("Palette-TaskBar nécessite Windows 11.\nPalette-TaskBar requires Windows 11.",
-                        "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Déjà lancé (clic sur l'icône épinglée) : l'instance en cours ouvre l'éditeur au premier plan.
+                    AllowSetForegroundWindow(-1);
+                    Signals.Send(Signals.OpenName);
                     return;
                 }
-                try { SetProcessDPIAware(); } catch (Exception) { }
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new TrayApp());
             }
         }
@@ -96,6 +113,11 @@ namespace PaletteTaskBar
             Path.Combine(Path.Combine(AppData, "PaletteBarre"), "palettes.json"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "palettes.json")
         };
+
+        public static void DeleteAll()
+        {
+            if (Directory.Exists(Folder)) Directory.Delete(Folder, true);
+        }
 
         public static Config Load()
         {
@@ -220,6 +242,13 @@ namespace PaletteTaskBar
         [DllImport("user32.dll")]
         static extern bool DestroyIcon(IntPtr handle);
 
+        // Icône palette embarquée par build.bat (/resource:palette.ico).
+        public static Icon App()
+        {
+            using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("palette.ico"))
+                return s != null ? new Icon(s) : null;
+        }
+
         static int Size()
         {
             int s = SystemInformation.SmallIconSize.Width;
@@ -304,10 +333,178 @@ namespace PaletteTaskBar
 
         public static void Set(bool on)
         {
+            Set(on, Assembly.GetEntryAssembly().Location);
+        }
+
+        public static void Set(bool on, string exe)
+        {
             using (RegistryKey k = Registry.CurrentUser.CreateSubKey(RunKey))
             {
-                if (on) k.SetValue(ValueName, "\"" + Assembly.GetEntryAssembly().Location + "\"");
+                if (on) k.SetValue(ValueName, "\"" + exe + "\"");
                 else k.DeleteValue(ValueName, false);
+            }
+        }
+    }
+
+    // ---------- Échanges entre deux lancements ----------
+
+    // Un second lancement demande à l'instance en cours d'ouvrir l'éditeur, ou de se fermer avant une mise à jour.
+    static class Signals
+    {
+        public const string MutexName = "Palette-TaskBar_UneSeuleInstance";
+        public const string OpenName = "Palette-TaskBar_Ouvrir";
+        public const string QuitName = "Palette-TaskBar_Quitter";
+
+        public static void Send(string name)
+        {
+            using (EventWaitHandle h = new EventWaitHandle(false, EventResetMode.AutoReset, name))
+                h.Set();
+        }
+    }
+
+    // ---------- Installation ----------
+
+    // L'exe téléchargé s'installe lui-même pour l'utilisateur courant, sans droits administrateur :
+    // copie dans %LOCALAPPDATA%\Programs, raccourci du menu Démarrer, lancement avec Windows,
+    // et entrée dans Paramètres → Applications installées pour la désinstallation.
+    static class Installer
+    {
+        const string Title = "Palette-TaskBar";
+        const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Palette-TaskBar";
+        static readonly string InstallDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Palette-TaskBar");
+        static readonly string InstalledExe = Path.Combine(InstallDir, "Palette-TaskBar.exe");
+        static readonly string StartMenuLink = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.Programs), "Palette-TaskBar.lnk");
+
+        public static bool IsInstalledCopy()
+        {
+            return string.Equals(Path.GetFullPath(Assembly.GetEntryAssembly().Location), Path.GetFullPath(InstalledExe),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static void Install()
+        {
+            bool update = File.Exists(InstalledExe);
+            string question = update
+                ? "Mettre à jour Palette-TaskBar ?\n\nVos palettes sont conservées."
+                : "Installer Palette-TaskBar ?\n\nLa palette sera ajoutée au menu Démarrer et se lancera avec Windows.";
+            if (MessageBox.Show(question, Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+
+            try
+            {
+                StopRunning();
+                Directory.CreateDirectory(InstallDir);
+                CopyWithRetry(Assembly.GetEntryAssembly().Location, InstalledExe);
+                CreateShortcut(StartMenuLink, InstalledExe);
+                Register();
+                // Mise à jour : on respecte le choix « Lancer au démarrage » déjà fait.
+                if (!update || Startup.IsEnabled()) Startup.Set(true, InstalledExe);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("L'installation a échoué :\n\n" + ex.Message, Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            Process.Start(InstalledExe);
+            MessageBox.Show(update
+                    ? "Palette-TaskBar est à jour."
+                    : "Palette-TaskBar est installé : les ronds sont à côté de l'horloge.\n\n" +
+                      "Pour garder la palette dans la barre des tâches, même programme fermé :\n" +
+                      "menu Démarrer → clic droit sur Palette-TaskBar → Épingler à la barre des tâches.",
+                Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        public static void Uninstall()
+        {
+            DialogResult answer = MessageBox.Show(
+                "Supprimer aussi vos palettes ?\n\nOui : tout est effacé.\nNon : les palettes sont gardées pour une prochaine installation.",
+                Title, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            if (answer == DialogResult.Cancel) return;
+
+            StopRunning();
+            try { File.Delete(StartMenuLink); } catch (Exception) { }
+            Startup.Set(false);
+            Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false);
+            if (answer == DialogResult.Yes) Store.DeleteAll();
+
+            MessageBox.Show("Palette-TaskBar est désinstallé.\n\nSi l'icône est encore dans la barre des tâches : clic droit dessus → Désépingler.",
+                Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            // L'exe en cours ne peut pas s'effacer lui-même : cmd attend sa fermeture puis supprime le dossier.
+            ProcessStartInfo cleanup = new ProcessStartInfo("cmd.exe",
+                "/c ping -n 3 127.0.0.1 >nul & rmdir /s /q \"" + InstallDir + "\"");
+            cleanup.WorkingDirectory = Path.GetTempPath();
+            cleanup.CreateNoWindow = true;
+            cleanup.UseShellExecute = false;
+            Process.Start(cleanup);
+        }
+
+        static void StopRunning()
+        {
+            int self = Process.GetCurrentProcess().Id;
+            List<Process> others = new List<Process>();
+            foreach (Process p in Process.GetProcessesByName("Palette-TaskBar"))
+                if (p.Id != self) others.Add(p); else p.Dispose();
+            if (others.Count == 0) return;
+
+            Signals.Send(Signals.QuitName);
+            foreach (Process p in others)
+            {
+                try
+                {
+                    if (!p.WaitForExit(5000)) { p.Kill(); p.WaitForExit(2000); }
+                }
+                catch (Exception) { }
+                p.Dispose();
+            }
+        }
+
+        static void CopyWithRetry(string from, string to)
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try { File.Copy(from, to, true); return; }
+                catch (IOException)
+                {
+                    if (attempt == 10) throw;
+                    Thread.Sleep(300);
+                }
+            }
+        }
+
+        static void CreateShortcut(string link, string target)
+        {
+            Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+            object shell = Activator.CreateInstance(shellType);
+            try
+            {
+                object shortcut = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { link });
+                Type t = shortcut.GetType();
+                t.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
+                t.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(target) });
+                t.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { target + ",0" });
+                t.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Palettes de couleurs dans la barre des tâches" });
+                t.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
+                Marshal.ReleaseComObject(shortcut);
+            }
+            finally { Marshal.ReleaseComObject(shell); }
+        }
+
+        static void Register()
+        {
+            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(UninstallKey))
+            {
+                k.SetValue("DisplayName", "Palette-TaskBar");
+                k.SetValue("DisplayIcon", InstalledExe + ",0");
+                k.SetValue("DisplayVersion", Assembly.GetEntryAssembly().GetName().Version.ToString(3));
+                k.SetValue("Publisher", "Cyril Neau");
+                k.SetValue("InstallLocation", InstallDir);
+                k.SetValue("UninstallString", "\"" + InstalledExe + "\" /uninstall");
+                k.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                k.SetValue("EstimatedSize", (int)(new FileInfo(InstalledExe).Length / 1024), RegistryValueKind.DWord);
             }
         }
     }
@@ -334,6 +531,8 @@ namespace PaletteTaskBar
         readonly NotifyIcon[] tray = new NotifyIcon[Slots];
         readonly string[] slotHex = new string[Slots];
         readonly ContextMenuStrip menu = new ContextMenuStrip();
+        // Fenêtre invisible qui ramène sur le fil de l'interface les demandes reçues d'un autre lancement.
+        readonly Control invoker = new Control();
         readonly System.Windows.Forms.Timer flashTimer = new System.Windows.Forms.Timer();
         readonly System.Windows.Forms.Timer startTimer = new System.Windows.Forms.Timer();
         // order[k] = icône affichée en k-ième position depuis la gauche.
@@ -353,8 +552,12 @@ namespace PaletteTaskBar
                 int slot = i;
                 NotifyIcon ni = new NotifyIcon();
                 ni.ContextMenuStrip = menu;
-                ni.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) OnSlotClick(slot); };                tray[i] = ni;
+                ni.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) OnSlotClick(slot); };
+                tray[i] = ni;
             }
+
+            IntPtr created = invoker.Handle;
+            ListenForSignals();
 
             flashTimer.Interval = 900;
             flashTimer.Tick += delegate { EndFlash(); };
@@ -378,6 +581,28 @@ namespace PaletteTaskBar
                 ApplyPalette();
             };
             startTimer.Start();
+        }
+
+        void ListenForSignals()
+        {
+            EventWaitHandle open = new EventWaitHandle(false, EventResetMode.AutoReset, Signals.OpenName);
+            EventWaitHandle quit = new EventWaitHandle(false, EventResetMode.AutoReset, Signals.QuitName);
+            Thread listener = new Thread(delegate()
+            {
+                WaitHandle[] handles = { open, quit };
+                while (true)
+                {
+                    if (WaitHandle.WaitAny(handles) == 0)
+                        invoker.BeginInvoke(new MethodInvoker(OpenEditor));
+                    else
+                    {
+                        invoker.BeginInvoke(new MethodInvoker(ExitThread));
+                        return;
+                    }
+                }
+            });
+            listener.IsBackground = true;
+            listener.Start();
         }
 
         void MeasureOrder()
@@ -609,6 +834,8 @@ namespace PaletteTaskBar
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
             Text = "Palettes de couleurs";
+            Icon icon = Icons.App();
+            if (icon != null) Icon = icon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;

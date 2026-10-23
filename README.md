@@ -22,10 +22,11 @@ Windows 11. Rien d'autre à installer.
 
 ### Installation
 
-1. Téléchargez `Palette-TaskBar.exe` dans la [dernière version](../../releases/latest).
-2. Rangez-le dans un dossier où il restera (par exemple `Documents\Palette-TaskBar`), puis lancez-le.
-3. Au premier lancement, Windows peut afficher « Windows a protégé votre ordinateur », car le programme n'est pas signé numériquement. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
-4. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez Palette-TaskBar.
+1. Téléchargez `Palette-TaskBar.exe` dans la [dernière version](../../releases/latest) et lancez-le.
+2. Windows peut afficher « Windows a protégé votre ordinateur », car le programme n'est pas signé numériquement. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
+3. Répondez **Oui** à « Installer Palette-TaskBar ? ». Le programme s'installe pour votre compte (sans droits administrateur), s'ajoute au menu Démarrer et se lancera avec Windows. Le fichier téléchargé peut ensuite être supprimé.
+4. Pour garder la palette dans la barre des tâches, même programme fermé : menu Démarrer → clic droit sur **Palette-TaskBar** → **Épingler à la barre des tâches**. Un clic sur l'icône relance la palette, ou ouvre l'éditeur si elle tourne déjà.
+5. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez Palette-TaskBar.
 
 ### Utilisation
 
@@ -33,6 +34,7 @@ Windows 11. Rien d'autre à installer.
 - Un champ vide n'affiche pas de rond.
 - **Enregistrer et afficher** enregistre toutes les palettes et affiche celle qui est sélectionnée.
 - Vos palettes sont enregistrées dans `%APPDATA%\Palette-TaskBar\palettes.json`. Vous pouvez modifier ce fichier à la main quand le programme est fermé.
+- **Mise à jour** : téléchargez la nouvelle version et lancez-la, vos palettes sont conservées.
 
 ### Compiler soi-même
 
@@ -40,12 +42,13 @@ Tout le programme tient dans `Palette-TaskBar.cs`. Double-cliquez sur `build.bat
 
 ### Désinstaller
 
-1. Clic droit sur un rond : décochez **Lancer au démarrage de Windows**, puis **Quitter**.
-2. Supprimez `Palette-TaskBar.exe` et le dossier `%APPDATA%\Palette-TaskBar`.
+Paramètres → Applications → Applications installées → **Palette-TaskBar** → **Désinstaller**. Le programme demande s'il faut aussi effacer vos palettes. Si l'icône reste dans la barre des tâches : clic droit dessus → **Désépingler**.
 
 ### Licence
 
 GPL v3, voir [LICENSE](LICENSE). © 2026 Cyril Neau.
+
+L'icône vient de [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) de Microsoft (« Artist palette », style 3D), sous licence MIT, reproduite en bas de cette page.
 
 ---
 
@@ -66,10 +69,11 @@ Windows 11. Nothing else to install.
 
 ### Installation
 
-1. Download `Palette-TaskBar.exe` from the [latest release](../../releases/latest).
-2. Put it in a folder where it will stay (for example `Documents\Palette-TaskBar`), then run it.
-3. On first launch, Windows may show "Windows protected your PC" because the program is not digitally signed. Click **More info**, then **Run anyway**.
-4. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn Palette-TaskBar on.
+1. Download `Palette-TaskBar.exe` from the [latest release](../../releases/latest) and run it.
+2. Windows may show "Windows protected your PC" because the program is not digitally signed. Click **More info**, then **Run anyway**.
+3. Answer **Oui** (Yes) to "Installer Palette-TaskBar ?". The program installs for your account (no administrator rights), adds itself to the Start menu and will start with Windows. You can then delete the downloaded file.
+4. To keep the palette in the taskbar, even when the program is closed: Start menu → right-click **Palette-TaskBar** → **Pin to taskbar**. Clicking the icon relaunches the palette, or opens the editor if it is already running.
+5. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn Palette-TaskBar on.
 
 ### Usage
 
@@ -77,6 +81,7 @@ Windows 11. Nothing else to install.
 - An empty field shows no dot.
 - **Enregistrer et afficher** (Save and show) saves all palettes and shows the selected one.
 - Your palettes are stored in `%APPDATA%\Palette-TaskBar\palettes.json`. You can edit this file by hand while the program is closed.
+- **Updating**: download the new version and run it, your palettes are kept.
 
 ### Build it yourself
 
@@ -84,9 +89,38 @@ The whole program is `Palette-TaskBar.cs`. Double-click `build.bat`: it uses the
 
 ### Uninstall
 
-1. Right-click a dot: uncheck **Lancer au démarrage de Windows** (Start with Windows), then **Quitter** (Quit).
-2. Delete `Palette-TaskBar.exe` and the `%APPDATA%\Palette-TaskBar` folder.
+Settings → Apps → Installed apps → **Palette-TaskBar** → **Uninstall**. The program asks whether to also delete your palettes. If the icon stays in the taskbar: right-click it → **Unpin from taskbar**.
 
 ### License
 
 GPL v3, see [LICENSE](LICENSE). © 2026 Cyril Neau.
+
+The icon comes from Microsoft's [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) ("Artist palette", 3D style), under the MIT license reproduced below.
+
+---
+
+### Fluent Emoji — MIT License
+
+```
+MIT License
+
+Copyright (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE
+```
