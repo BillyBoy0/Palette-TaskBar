@@ -12,9 +12,11 @@ Vos palettes de couleurs dans la barre des tâches de Windows 11 : un clic sur u
 ### Ce que ça fait
 
 - Jusqu'à 6 ronds de couleur à côté de l'horloge.
-- **Clic gauche** sur un rond : son code (par exemple `#f5c518`) est copié dans le presse-papiers, une coche confirme la copie.
-- **Clic droit** : changer de palette, gérer les palettes, lancer au démarrage de Windows, quitter.
+- **Clic sur un rond** : son code (par exemple `#f5c518`) est copié dans le presse-papiers, une coche confirme la copie.
+- **Clic droit** : changer de palette, gérer les palettes, quitter.
+- **Quitter** : les ronds laissent la place à une seule icône palette. Un clic dessus pour choisir une palette et faire revenir les couleurs.
 - **Éditeur de palettes** : un nom et jusqu'à 6 couleurs par palette. Un clic sur la pastille ouvre le sélecteur de couleurs de Windows ; le bouton pipette prend une couleur n'importe où à l'écran (loupe, flèches du clavier pour viser au pixel près, Échap pour annuler).
+- Interface en français ou en anglais, au choix à l'installation.
 
 ### Prérequis
 
@@ -24,15 +26,16 @@ Windows 11. Rien d'autre à installer.
 
 1. Téléchargez `Palette-TaskBar.exe` dans la [dernière version](../../releases/latest) et lancez-le.
 2. Windows peut afficher « Windows a protégé votre ordinateur », car le programme n'est pas signé numériquement. Cliquez sur **Informations complémentaires**, puis **Exécuter quand même**.
-3. Répondez **Oui** à « Installer Palette-TaskBar ? ». Le programme s'installe pour votre compte (sans droits administrateur), s'ajoute au menu Démarrer et se lancera avec Windows. Le fichier téléchargé peut ensuite être supprimé.
-4. Pour garder la palette dans la barre des tâches, même programme fermé : menu Démarrer → clic droit sur **Palette-TaskBar** → **Épingler à la barre des tâches**. Un clic sur l'icône relance la palette, ou ouvre l'éditeur si elle tourne déjà.
-5. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez Palette-TaskBar.
+3. Choisissez votre langue : **Français** ou **English**. Le programme s'installe pour votre compte (sans droits administrateur), s'ajoute au menu Démarrer et se lancera avec Windows. Le fichier téléchargé peut ensuite être supprimé.
+4. Si les ronds n'apparaissent pas à côté de l'horloge, ils sont cachés sous la flèche **^**. Pour les afficher : Paramètres → Personnalisation → Barre des tâches → Autres icônes de la barre d'état système, puis activez Palette-TaskBar.
 
 ### Utilisation
 
 - Clic droit sur un rond → **Gérer les palettes…** pour créer vos palettes.
 - Un champ vide n'affiche pas de rond.
 - **Enregistrer et afficher** enregistre toutes les palettes et affiche celle qui est sélectionnée.
+- **Changer de langue** : relancez le fichier téléchargé et choisissez l'autre langue, vos palettes sont conservées.
+- Pour que Palette-TaskBar ne se lance plus avec Windows : Paramètres → Applications → Démarrage.
 - Vos palettes sont enregistrées dans `%APPDATA%\Palette-TaskBar\palettes.json`. Vous pouvez modifier ce fichier à la main quand le programme est fermé.
 - **Mise à jour** : téléchargez la nouvelle version et lancez-la, vos palettes sont conservées.
 
@@ -54,14 +57,14 @@ L'icône vient de [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) de
 
 ## English
 
-> The interface is in French.
-
 ### What it does
 
 - Up to 6 color dots next to the clock.
-- **Left-click** a dot: its code (for example `#f5c518`) is copied to the clipboard, and a check mark confirms the copy.
-- **Right-click**: switch palette, manage palettes, start with Windows, quit.
+- **Click a dot**: its code (for example `#f5c518`) is copied to the clipboard, and a check mark confirms the copy.
+- **Right-click**: switch palette, manage palettes, quit.
+- **Quit**: the dots make way for a single palette icon. Click it to pick a palette and bring the colors back.
 - **Palette editor**: a name and up to 6 colors per palette. Clicking a swatch opens the Windows color picker; the eyedropper button picks a color anywhere on screen (magnifier, arrow keys for pixel-precise aiming, Esc to cancel).
+- French or English interface, chosen during installation.
 
 ### Requirements
 
@@ -71,15 +74,16 @@ Windows 11. Nothing else to install.
 
 1. Download `Palette-TaskBar.exe` from the [latest release](../../releases/latest) and run it.
 2. Windows may show "Windows protected your PC" because the program is not digitally signed. Click **More info**, then **Run anyway**.
-3. Answer **Oui** (Yes) to "Installer Palette-TaskBar ?". The program installs for your account (no administrator rights), adds itself to the Start menu and will start with Windows. You can then delete the downloaded file.
-4. To keep the palette in the taskbar, even when the program is closed: Start menu → right-click **Palette-TaskBar** → **Pin to taskbar**. Clicking the icon relaunches the palette, or opens the editor if it is already running.
-5. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn Palette-TaskBar on.
+3. Choose your language: **Français** or **English**. The program installs for your account (no administrator rights), adds itself to the Start menu and will start with Windows. You can then delete the downloaded file.
+4. If the dots don't appear next to the clock, they are hidden under the **^** arrow. To show them: Settings → Personalization → Taskbar → Other system tray icons, then turn Palette-TaskBar on.
 
 ### Usage
 
-- Right-click a dot → **Gérer les palettes…** (Manage palettes) to create your palettes.
+- Right-click a dot → **Manage palettes…** to create your palettes.
 - An empty field shows no dot.
-- **Enregistrer et afficher** (Save and show) saves all palettes and shows the selected one.
+- **Save and show** saves all palettes and shows the selected one.
+- **Changing language**: run the downloaded file again and choose the other language, your palettes are kept.
+- To stop Palette-TaskBar from starting with Windows: Settings → Apps → Startup.
 - Your palettes are stored in `%APPDATA%\Palette-TaskBar\palettes.json`. You can edit this file by hand while the program is closed.
 - **Updating**: download the new version and run it, your palettes are kept.
 

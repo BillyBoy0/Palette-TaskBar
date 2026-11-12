@@ -1,5 +1,5 @@
-// Palette-TaskBar : jusqu'à 6 ronds de couleur dans la zone de notification.
-// Clic gauche = copie le code hex, clic droit = changer de palette / gérer les palettes.
+// Palette-TaskBar : jusqu'à 6 ronds de couleur dans la zone de notification ; quitter les remplace par une icône palette.
+// Clic sur un rond = copie le code hex, clic droit = changer de palette, gérer les palettes, quitter.
 // Compiler avec build.bat (compilateur C# fourni avec Windows, C# 5).
 
 using System;
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -22,8 +23,8 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("Palettes de couleurs dans la barre des tâches")]
 [assembly: AssemblyCompany("Cyril Neau")]
 [assembly: AssemblyCopyright("© 2026 Cyril Neau")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 namespace PaletteTaskBar
 {
@@ -48,6 +49,7 @@ namespace PaletteTaskBar
                     "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
+            Lang.Load();
             if (args.Length > 0 && args[0] == "/uninstall") { Installer.Uninstall(); return; }
             if (!Installer.IsInstalledCopy()) { Installer.Install(); return; }
 
@@ -81,6 +83,49 @@ namespace PaletteTaskBar
         }
     }
 
+    // ---------- Langue ----------
+
+    // Choisie à l'installation et rangée dans le registre ; à défaut, celle de Windows.
+    static class Lang
+    {
+        const string Key = @"Software\Palette-TaskBar";
+        public static bool English;
+
+        public static string T(string fr, string en)
+        {
+            return English ? en : fr;
+        }
+
+        public static void Load()
+        {
+            string value = null;
+            try
+            {
+                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(Key))
+                    if (k != null) value = k.GetValue("Language") as string;
+            }
+            catch (Exception) { }
+            English = value != null ? value == "en" : !SystemIsFrench();
+        }
+
+        public static bool SystemIsFrench()
+        {
+            return CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "fr";
+        }
+
+        public static void Save(bool english)
+        {
+            English = english;
+            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(Key))
+                k.SetValue("Language", english ? "en" : "fr");
+        }
+
+        public static void Delete()
+        {
+            try { Registry.CurrentUser.DeleteSubKeyTree(Key, false); } catch (Exception) { }
+        }
+    }
+
     // ---------- Données ----------
 
     public class Palette
@@ -92,6 +137,8 @@ namespace PaletteTaskBar
     public class Config
     {
         public string active { get; set; }
+        // Ronds masqués : seule l'icône palette reste dans la barre.
+        public bool hidden { get; set; }
         public List<Palette> palettes { get; set; }
 
         public Palette Active()
@@ -143,7 +190,9 @@ namespace PaletteTaskBar
                 catch (Exception ex)
                 {
                     // Fichier abîmé : on ne l'écrase pas, on travaille avec l'exemple en mémoire.
-                    MessageBox.Show("palettes.json est illisible, la palette d'exemple est utilisée en attendant.\n\n" + ex.Message,
+                    MessageBox.Show(Lang.T("palettes.json est illisible, la palette d'exemple est utilisée en attendant.",
+                                           "palettes.json can't be read, the example palette is used in the meantime.") +
+                                    "\n\n" + ex.Message,
                         "Palette-TaskBar", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return Example();
                 }
@@ -158,7 +207,9 @@ namespace PaletteTaskBar
             Directory.CreateDirectory(Folder);
             JavaScriptSerializer js = new JavaScriptSerializer();
             StringBuilder sb = new StringBuilder();
-            sb.Append("{\r\n  \"active\": ").Append(js.Serialize(c.active)).Append(",\r\n  \"palettes\": [\r\n");
+            sb.Append("{\r\n  \"active\": ").Append(js.Serialize(c.active))
+              .Append(",\r\n  \"hidden\": ").Append(c.hidden ? "true" : "false")
+              .Append(",\r\n  \"palettes\": [\r\n");
             for (int i = 0; i < c.palettes.Count; i++)
             {
                 Palette p = c.palettes[i];
@@ -173,10 +224,10 @@ namespace PaletteTaskBar
         static Config Example()
         {
             Config c = new Config();
-            c.active = "Exemple";
+            c.active = Lang.T("Exemple", "Example");
             c.palettes = new List<Palette>();
             Palette p = new Palette();
-            p.name = "Exemple";
+            p.name = c.active;
             p.colors = new List<string> { "#ffffff", "#1e1e1e", "#f5c518" };
             c.palettes.Add(p);
             return c;
@@ -188,7 +239,7 @@ namespace PaletteTaskBar
             c.palettes.RemoveAll(delegate(Palette p) { return p == null; });
             foreach (Palette p in c.palettes)
             {
-                if (string.IsNullOrWhiteSpace(p.name)) p.name = "Sans nom";
+                if (string.IsNullOrWhiteSpace(p.name)) p.name = Lang.T("Sans nom", "Untitled");
                 List<string> clean = new List<string>();
                 if (p.colors != null)
                     foreach (string s in p.colors)
@@ -242,14 +293,28 @@ namespace PaletteTaskBar
         [DllImport("user32.dll")]
         static extern bool DestroyIcon(IntPtr handle);
 
-        // Icône palette embarquée par build.bat (/resource:palette.ico).
+        // Icône palette embarquée par build.bat (/resource:palette.ico), toutes tailles comprises.
         public static Icon App()
         {
             using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("palette.ico"))
                 return s != null ? new Icon(s) : null;
         }
 
-        static int Size()
+        // La taille du fichier .ico la plus proche de celle demandée.
+        public static Icon App(Size size)
+        {
+            using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream("palette.ico"))
+                return s != null ? new Icon(s, size) : null;
+        }
+
+        // Icône palette de la zone de notification.
+        public static Icon Palette()
+        {
+            int s = TraySize();
+            return App(new Size(s, s)) ?? Empty();
+        }
+
+        static int TraySize()
         {
             int s = SystemInformation.SmallIconSize.Width;
             return s < 16 ? 16 : s;
@@ -257,7 +322,7 @@ namespace PaletteTaskBar
 
         public static Icon Circle(Color color, bool check)
         {
-            int s = Size();
+            int s = TraySize();
             using (Bitmap bmp = new Bitmap(s, s, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             using (Graphics g = Graphics.FromImage(bmp))
             {
@@ -288,10 +353,10 @@ namespace PaletteTaskBar
             }
         }
 
-        // Rond pointillé gris : palette vide, garde un point d'accès au menu.
+        // Rond pointillé gris : place réservée le temps que Windows range les icônes.
         public static Icon Empty()
         {
-            int s = Size();
+            int s = TraySize();
             using (Bitmap bmp = new Bitmap(s, s, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
             using (Graphics g = Graphics.FromImage(bmp))
             {
@@ -320,29 +385,22 @@ namespace PaletteTaskBar
 
     // ---------- Démarrage avec Windows ----------
 
+    // Toujours activé à l'installation. Pour l'éviter : Paramètres → Applications → Démarrage.
     static class Startup
     {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         const string ValueName = "Palette-TaskBar";
 
-        public static bool IsEnabled()
-        {
-            using (RegistryKey k = Registry.CurrentUser.OpenSubKey(RunKey))
-                return k != null && k.GetValue(ValueName) != null;
-        }
-
-        public static void Set(bool on)
-        {
-            Set(on, Assembly.GetEntryAssembly().Location);
-        }
-
-        public static void Set(bool on, string exe)
+        public static void Enable(string exe)
         {
             using (RegistryKey k = Registry.CurrentUser.CreateSubKey(RunKey))
-            {
-                if (on) k.SetValue(ValueName, "\"" + exe + "\"");
-                else k.DeleteValue(ValueName, false);
-            }
+                k.SetValue(ValueName, "\"" + exe + "\"");
+        }
+
+        public static void Disable()
+        {
+            using (RegistryKey k = Registry.CurrentUser.OpenSubKey(RunKey, true))
+                if (k != null) k.DeleteValue(ValueName, false);
         }
     }
 
@@ -386,50 +444,59 @@ namespace PaletteTaskBar
         public static void Install()
         {
             bool update = File.Exists(InstalledExe);
-            string question = update
-                ? "Mettre à jour Palette-TaskBar ?\n\nVos palettes sont conservées."
-                : "Installer Palette-TaskBar ?\n\nLa palette sera ajoutée au menu Démarrer et se lancera avec Windows.";
-            if (MessageBox.Show(question, Title, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            // Le choix de la langue vaut confirmation ; relancer l'installation permet d'en changer.
+            bool english;
+            if (!LanguageForm.Ask(out english)) return;
 
             try
             {
+                Lang.Save(english);
                 StopRunning();
                 Directory.CreateDirectory(InstallDir);
                 CopyWithRetry(Assembly.GetEntryAssembly().Location, InstalledExe);
                 CreateShortcut(StartMenuLink, InstalledExe);
                 Register();
-                // Mise à jour : on respecte le choix « Lancer au démarrage » déjà fait.
-                if (!update || Startup.IsEnabled()) Startup.Set(true, InstalledExe);
+                Startup.Enable(InstalledExe);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("L'installation a échoué :\n\n" + ex.Message, Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(Lang.T("L'installation a échoué :", "Installation failed:") + "\n\n" + ex.Message,
+                    Title, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
             Process.Start(InstalledExe);
             MessageBox.Show(update
-                    ? "Palette-TaskBar est à jour."
-                    : "Palette-TaskBar est installé : les ronds sont à côté de l'horloge.\n\n" +
-                      "Pour garder la palette dans la barre des tâches, même programme fermé :\n" +
-                      "menu Démarrer → clic droit sur Palette-TaskBar → Épingler à la barre des tâches.",
+                    ? Lang.T("Palette-TaskBar est à jour. Vos palettes sont conservées.",
+                             "Palette-TaskBar is up to date. Your palettes are kept.")
+                    : Lang.T("Palette-TaskBar est installé : vos couleurs sont à côté de l'horloge.\n\n" +
+                             "Clic gauche pour copier une couleur.\nClic droit pour changer les paramètres.",
+                             "Palette-TaskBar is installed: your colors are next to the clock.\n\n" +
+                             "Left-click to copy a color.\nRight-click to change the settings."),
                 Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         public static void Uninstall()
         {
-            DialogResult answer = MessageBox.Show(
-                "Supprimer aussi vos palettes ?\n\nOui : tout est effacé.\nNon : les palettes sont gardées pour une prochaine installation.",
+            DialogResult answer = MessageBox.Show(Lang.T(
+                    "Supprimer aussi vos palettes ?\n\nOui : tout est effacé.\nNon : les palettes sont gardées pour une prochaine installation.",
+                    "Also delete your palettes?\n\nYes: everything is erased.\nNo: your palettes are kept for a future installation."),
                 Title, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
             if (answer == DialogResult.Cancel) return;
 
             StopRunning();
             try { File.Delete(StartMenuLink); } catch (Exception) { }
-            Startup.Set(false);
+            Startup.Disable();
             Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false);
-            if (answer == DialogResult.Yes) Store.DeleteAll();
+            if (answer == DialogResult.Yes)
+            {
+                Store.DeleteAll();
+                Lang.Delete();
+            }
 
-            MessageBox.Show("Palette-TaskBar est désinstallé.\n\nSi l'icône est encore dans la barre des tâches : clic droit dessus → Désépingler.",
+            MessageBox.Show(Lang.T(
+                    "Palette-TaskBar est désinstallé.\n\nSi l'icône est encore dans la barre des tâches : clic droit dessus → Désépingler.",
+                    "Palette-TaskBar is uninstalled.\n\nIf its icon is still pinned to the taskbar: right-click it → Unpin from taskbar."),
                 Title, MessageBoxButtons.OK, MessageBoxIcon.Information);
 
             // L'exe en cours ne peut pas s'effacer lui-même : cmd attend sa fermeture puis supprime le dossier.
@@ -485,7 +552,8 @@ namespace PaletteTaskBar
                 t.InvokeMember("TargetPath", BindingFlags.SetProperty, null, shortcut, new object[] { target });
                 t.InvokeMember("WorkingDirectory", BindingFlags.SetProperty, null, shortcut, new object[] { Path.GetDirectoryName(target) });
                 t.InvokeMember("IconLocation", BindingFlags.SetProperty, null, shortcut, new object[] { target + ",0" });
-                t.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] { "Palettes de couleurs dans la barre des tâches" });
+                t.InvokeMember("Description", BindingFlags.SetProperty, null, shortcut, new object[] {
+                    Lang.T("Palettes de couleurs dans la barre des tâches", "Color palettes in the taskbar") });
                 t.InvokeMember("Save", BindingFlags.InvokeMethod, null, shortcut, null);
                 Marshal.ReleaseComObject(shortcut);
             }
@@ -509,6 +577,91 @@ namespace PaletteTaskBar
         }
     }
 
+    // ---------- Fenêtre d'installation : choix de la langue ----------
+
+    // Écrite en anglais, puisque la langue n'est pas encore connue. Le choix vaut confirmation.
+    class LanguageForm : Form
+    {
+        public bool English { get; private set; }
+
+        public LanguageForm()
+        {
+            SuspendLayout();
+            AutoScaleDimensions = new SizeF(96F, 96F);
+            AutoScaleMode = AutoScaleMode.Dpi;
+            Font = new Font("Segoe UI", 9F);
+            Text = "Palette-TaskBar";
+            Icon icon = Icons.App();
+            if (icon != null) Icon = icon;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            StartPosition = FormStartPosition.CenterScreen;
+            ClientSize = new Size(360, 116);
+
+            PictureBox picture = new PictureBox();
+            picture.SetBounds(18, 14, 40, 40);
+            picture.SizeMode = PictureBoxSizeMode.Zoom;
+            Icon big = Icons.App(new Size(64, 64));
+            if (big != null) picture.Image = big.ToBitmap();
+            Controls.Add(picture);
+
+            AddLabel("Choose your language", 72, 22, new Font("Segoe UI", 11F, FontStyle.Bold), SystemColors.ControlText);
+
+            Button french = AddButton("Français", 72, 72, 96);
+            french.Click += delegate { Choose(false); };
+            Button english = AddButton("English", 174, 72, 96);
+            english.Click += delegate { Choose(true); };
+            Button cancel = AddButton("Cancel", 276, 72, 72);
+            cancel.DialogResult = DialogResult.Cancel;
+            CancelButton = cancel;
+
+            // Entrée = la langue de Windows.
+            Button preferred = Lang.SystemIsFrench() ? french : english;
+            AcceptButton = preferred;
+            ActiveControl = preferred;
+
+            ResumeLayout(false);
+            PerformLayout();
+        }
+
+        public static bool Ask(out bool english)
+        {
+            using (LanguageForm f = new LanguageForm())
+            {
+                bool ok = f.ShowDialog() == DialogResult.OK;
+                english = f.English;
+                return ok;
+            }
+        }
+
+        void Choose(bool english)
+        {
+            English = english;
+            DialogResult = DialogResult.OK;
+        }
+
+        void AddLabel(string text, int x, int y, Font font, Color color)
+        {
+            Label l = new Label();
+            l.Text = text;
+            l.Font = font;
+            l.ForeColor = color;
+            l.AutoSize = true;
+            l.Location = new Point(x, y);
+            Controls.Add(l);
+        }
+
+        Button AddButton(string text, int x, int y, int w)
+        {
+            Button b = new Button();
+            b.Text = text;
+            b.SetBounds(x, y, w, 30);
+            Controls.Add(b);
+            return b;
+        }
+    }
+
     // ---------- Zone de notification ----------
 
     class TrayApp : ApplicationContext
@@ -527,17 +680,24 @@ namespace PaletteTaskBar
         // NotifyIcon ne publie ni sa fenêtre ni son identifiant, nécessaires pour demander sa position à Windows.
         static readonly FieldInfo IdField = typeof(NotifyIcon).GetField("id", BindingFlags.NonPublic | BindingFlags.Instance);
         static readonly FieldInfo WindowField = typeof(NotifyIcon).GetField("window", BindingFlags.NonPublic | BindingFlags.Instance);
+        // Ouvre le menu comme un clic droit, pour le clic gauche sur l'icône palette.
+        static readonly MethodInfo ShowMenuMethod = typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.NonPublic | BindingFlags.Instance);
 
         readonly NotifyIcon[] tray = new NotifyIcon[Slots];
+        // Icône palette : remplace les ronds quand on quitte, pour les faire revenir. Le programme ne se ferme jamais vraiment.
+        readonly NotifyIcon home;
         readonly string[] slotHex = new string[Slots];
         readonly ContextMenuStrip menu = new ContextMenuStrip();
         // Fenêtre invisible qui ramène sur le fil de l'interface les demandes reçues d'un autre lancement.
         readonly Control invoker = new Control();
         readonly System.Windows.Forms.Timer flashTimer = new System.Windows.Forms.Timer();
         readonly System.Windows.Forms.Timer startTimer = new System.Windows.Forms.Timer();
+        // Une icône qui apparaît pour la première fois est rangée sous la flèche ^ : on la remonte dès qu'elle est inscrite.
+        readonly System.Windows.Forms.Timer promoteTimer = new System.Windows.Forms.Timer();
+        int promoteTries;
         // order[k] = icône affichée en k-ième position depuis la gauche.
         int[] order = { 0, 1, 2, 3, 4, 5 };
-        int startStep;
+        bool measured;
         int flashSlot = -1;
         Config config;
         EditorForm editor;
@@ -555,6 +715,12 @@ namespace PaletteTaskBar
                 ni.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) OnSlotClick(slot); };
                 tray[i] = ni;
             }
+            // Créée après les ronds : chaque icône garde son numéro d'un lancement à l'autre, et Windows sa place.
+            home = new NotifyIcon();
+            home.Icon = Icons.Palette();
+            home.Text = "Palette-TaskBar";
+            home.ContextMenuStrip = menu;
+            home.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) ShowMenu(); };
 
             IntPtr created = invoker.Handle;
             ListenForSignals();
@@ -562,25 +728,58 @@ namespace PaletteTaskBar
             flashTimer.Interval = 900;
             flashTimer.Tick += delegate { EndFlash(); };
 
-            // Windows mémorise la place de chaque icône et met toute nouvelle icône à gauche.
-            // Au lancement les 6 apparaissent (ajoutées de 6 vers 1 pour qu'une première installation soit dans l'ordre),
-            // puis on lit leur position réelle à l'écran et les couleurs y sont rangées de gauche à droite.
+            // Laisse à Windows le temps de ranger les ronds à côté de l'horloge avant de lire leur place.
+            startTimer.Interval = 2000;
+            startTimer.Tick += delegate { OnStartTick(); };
+
+            promoteTimer.Interval = 300;
+            promoteTimer.Tick += delegate
+            {
+                if (PromoteIcons() || ++promoteTries >= 60) promoteTimer.Stop();
+            };
+
+            if (config.hidden) home.Visible = true;
+            else ShowPlaceholders();
+            StartPromoting();
+            startTimer.Start();
+        }
+
+        // Windows mémorise la place de chaque icône. Les 6 ronds apparaissent d'abord en attente
+        // (ajoutés de 6 vers 1 pour qu'une première installation soit dans l'ordre),
+        // puis on lit leur position réelle à l'écran et les couleurs y sont rangées de gauche à droite.
+        void ShowPlaceholders()
+        {
             for (int i = Slots - 1; i >= 0; i--)
             {
                 SetIcon(i, Icons.Empty());
                 tray[i].Text = "Palette-TaskBar";
                 tray[i].Visible = true;
             }
-            startTimer.Interval = 1000;
-            startTimer.Tick += delegate
+        }
+
+        void OnStartTick()
+        {
+            startTimer.Stop();
+            if (!config.hidden && !measured)
             {
-                startStep++;
-                if (startStep == 1) { PromoteIcons(); return; }
-                startTimer.Stop();
                 MeasureOrder();
-                ApplyPalette();
-            };
-            startTimer.Start();
+                measured = true;
+            }
+            ApplyPalette();
+        }
+
+        // Met les ronds à jour. La première fois qu'ils s'affichent, Windows doit d'abord leur donner une place.
+        void Refresh()
+        {
+            if (!config.hidden && !measured)
+            {
+                ShowPlaceholders();
+                StartPromoting();
+                startTimer.Stop();
+                startTimer.Start();
+                return;
+            }
+            if (!startTimer.Enabled) ApplyPalette();
         }
 
         void ListenForSignals()
@@ -631,14 +830,16 @@ namespace PaletteTaskBar
             return true;
         }
 
-        public void ApplyPalette()
+        void ApplyPalette()
         {
             flashTimer.Stop();
             flashSlot = -1;
 
             Palette p = config.Active();
-            List<string> colors = p != null ? p.colors : new List<string>();
             string paletteName = p != null ? p.name : "";
+            List<string> colors = p != null && !config.hidden ? p.colors : new List<string>();
+            // Ronds ou icône palette, jamais les deux ; l'icône seule aussi pour une palette vide, pour garder un accès au menu.
+            bool showHome = colors.Count == 0;
 
             bool[] want = new bool[Slots];
             for (int k = 0; k < Slots; k++)
@@ -652,17 +853,18 @@ namespace PaletteTaskBar
                     tray[t].Text = Clip(slotHex[t] + "  ·  " + paletteName);
                 }
             }
-            if (colors.Count == 0)
-            {
-                int t = order[0];
-                want[t] = true;
-                SetIcon(t, Icons.Empty());
-                tray[t].Text = Clip("Palette « " + paletteName + " » vide : clic pour la remplir");
-            }
 
             // Masquer puis réafficher une icône connue ne change pas sa place.
             for (int i = 0; i < Slots; i++)
                 if (tray[i].Visible != want[i]) tray[i].Visible = want[i];
+
+            home.Text = Clip(config.hidden || p == null ? "Palette-TaskBar" : "Palette-TaskBar  ·  " + paletteName);
+            if (showHome && !home.Visible)
+            {
+                home.Visible = true;
+                StartPromoting();
+            }
+            else if (!showHome && home.Visible) home.Visible = false;
         }
 
         static string Clip(string text)
@@ -699,6 +901,16 @@ namespace PaletteTaskBar
             flashSlot = -1;
         }
 
+        void ShowMenu()
+        {
+            if (ShowMenuMethod != null)
+            {
+                try { ShowMenuMethod.Invoke(home, null); return; }
+                catch (Exception) { }
+            }
+            OpenEditor();
+        }
+
         void BuildMenu()
         {
             ToolStripItem[] olds = new ToolStripItem[menu.Items.Count];
@@ -711,29 +923,32 @@ namespace PaletteTaskBar
             {
                 string name = p.name;
                 ToolStripMenuItem item = new ToolStripMenuItem(name.Replace("&", "&&"));
-                item.Checked = p == current;
+                item.Checked = !config.hidden && p == current;
                 item.Click += delegate
                 {
                     config.active = name;
+                    config.hidden = false;
                     Store.Save(config);
-                    ApplyPalette();
+                    Refresh();
                 };
                 menu.Items.Add(item);
             }
 
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem manage = new ToolStripMenuItem("Gérer les palettes…");
+            ToolStripMenuItem manage = new ToolStripMenuItem(Lang.T("Gérer les palettes…", "Manage palettes…"));
             manage.Click += delegate { OpenEditor(); };
             menu.Items.Add(manage);
 
-            ToolStripMenuItem startup = new ToolStripMenuItem("Lancer au démarrage de Windows");
-            startup.Checked = Startup.IsEnabled();
-            startup.Click += delegate { Startup.Set(!Startup.IsEnabled()); };
-            menu.Items.Add(startup);
-
+            if (config.hidden) return;
+            // Quitter range les ronds et laisse l'icône palette, même après un redémarrage de Windows.
             menu.Items.Add(new ToolStripSeparator());
-            ToolStripMenuItem quit = new ToolStripMenuItem("Quitter");
-            quit.Click += delegate { ExitThread(); };
+            ToolStripMenuItem quit = new ToolStripMenuItem(Lang.T("Quitter", "Quit"));
+            quit.Click += delegate
+            {
+                config.hidden = true;
+                Store.Save(config);
+                Refresh();
+            };
             menu.Items.Add(quit);
         }
 
@@ -750,35 +965,58 @@ namespace PaletteTaskBar
             editor.Activate();
         }
 
+        // « Enregistrer et afficher » : la palette choisie s'affiche, même si les couleurs étaient masquées.
         public void SavePalettes(List<Palette> palettes, string activeName)
         {
             config.palettes = palettes;
             config.active = activeName;
+            config.hidden = false;
             Store.Save(config);
-            ApplyPalette();
+            Refresh();
         }
 
-        // Windows 11 range les nouvelles icônes sous la flèche ^ : on les épingle dans la barre.
-        static void PromoteIcons()
+        void StartPromoting()
         {
+            promoteTries = 0;
+            promoteTimer.Stop();
+            promoteTimer.Start();
+        }
+
+        // Windows 11 inscrit chaque nouvelle icône dans NotifyIconSettings peu après son apparition (0,3 s mesuré)
+        // et la range sous la flèche ^ : on la remet à côté de l'horloge, l'effet est immédiat.
+        // Vrai quand toutes les icônes affichées ont été trouvées.
+        bool PromoteIcons()
+        {
+            List<int> waiting = new List<int>();
+            if (IdField != null)
+            {
+                foreach (NotifyIcon ni in tray)
+                    if (ni.Visible) waiting.Add((int)IdField.GetValue(ni));
+                if (home.Visible) waiting.Add((int)IdField.GetValue(home));
+            }
+            bool any = false;
             try
             {
                 string exe = Assembly.GetEntryAssembly().Location;
                 using (RegistryKey root = Registry.CurrentUser.OpenSubKey(@"Control Panel\NotifyIconSettings"))
                 {
-                    if (root == null) return;
+                    if (root == null) return true;  // pas de réglage par icône sur ce Windows
                     foreach (string sub in root.GetSubKeyNames())
                         using (RegistryKey k = root.OpenSubKey(sub, true))
                         {
                             if (k == null) continue;
                             string path = k.GetValue("ExecutablePath") as string;
                             if (path == null || !string.Equals(path, exe, StringComparison.OrdinalIgnoreCase)) continue;
+                            any = true;
+                            object uid = k.GetValue("UID");
+                            if (uid is int) waiting.Remove((int)uid);
                             object v = k.GetValue("IsPromoted");
                             if (!(v is int) || (int)v != 1) k.SetValue("IsPromoted", 1, RegistryValueKind.DWord);
                         }
                 }
             }
-            catch (Exception) { }
+            catch (Exception) { return true; }
+            return IdField != null ? waiting.Count == 0 : any;
         }
 
         protected override void ExitThreadCore()
@@ -788,6 +1026,8 @@ namespace PaletteTaskBar
                 ni.Visible = false;
                 ni.Dispose();
             }
+            home.Visible = false;
+            home.Dispose();
             if (editor != null && !editor.IsDisposed) editor.Close();
             base.ExitThreadCore();
         }
@@ -833,7 +1073,7 @@ namespace PaletteTaskBar
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = new Font("Segoe UI", 9F);
-            Text = "Palettes de couleurs";
+            Text = Lang.T("Palettes de couleurs", "Color palettes");
             Icon icon = Icons.App();
             if (icon != null) Icon = icon;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -846,12 +1086,12 @@ namespace PaletteTaskBar
             list.SelectedIndexChanged += delegate { if (!loading) LoadSelected(); };
             Controls.Add(list);
 
-            Button add = MakeButton("Nouvelle", 12, 272, 77, 28);
+            Button add = MakeButton(Lang.T("Nouvelle", "New"), 12, 272, 77, 28);
             add.Click += delegate { AddPalette(); };
-            Button del = MakeButton("Supprimer", 95, 272, 77, 28);
+            Button del = MakeButton(Lang.T("Supprimer", "Delete"), 95, 272, 77, 28);
             del.Click += delegate { DeletePalette(); };
 
-            AddLabel("Nom", 188, 15);
+            AddLabel(Lang.T("Nom", "Name"), 188, 15);
             nameBox.SetBounds(226, 12, 262, 23);
             nameBox.TextChanged += delegate { OnNameChanged(); };
             Controls.Add(nameBox);
@@ -883,9 +1123,9 @@ namespace PaletteTaskBar
                 hexBoxes[i] = hb;
                 Controls.Add(hb);
 
-                tips.SetToolTip(sw, "Choisir une couleur");
+                tips.SetToolTip(sw, Lang.T("Choisir une couleur", "Choose a color"));
 
-                Button pipette = MakeButton("Pipette", 392, y, 38, 28);
+                Button pipette = MakeButton(Lang.T("Pipette", "Eyedropper"), 392, y, 38, 28);
                 if (iconFont != null)
                 {
                     pipette.Font = iconFont;
@@ -893,17 +1133,18 @@ namespace PaletteTaskBar
                 }
                 else pipette.SetBounds(348, y, 82, 28);
                 pipette.Click += delegate { Eyedrop(slot); };
-                tips.SetToolTip(pipette, "Prendre une couleur à l'écran (Échap pour annuler)");
-                Button clear = MakeButton("Vider", 438, y, 50, 28);
+                tips.SetToolTip(pipette, Lang.T("Prendre une couleur à l'écran (Échap pour annuler)",
+                                                "Pick a color on screen (Esc to cancel)"));
+                Button clear = MakeButton(Lang.T("Vider", "Clear"), 438, y, 50, 28);
                 clear.Click += delegate { hexBoxes[slot].Text = ""; };
             }
 
-            Label hint = AddLabel("Un champ vide n'affiche pas de rond.", 188, 270);
+            Label hint = AddLabel(Lang.T("Un champ vide n'affiche pas de rond.", "An empty field shows no dot."), 188, 270);
             hint.ForeColor = SystemColors.GrayText;
 
-            Button save = MakeButton("Enregistrer et afficher", 254, 298, 154, 30);
+            Button save = MakeButton(Lang.T("Enregistrer et afficher", "Save and show"), 254, 298, 154, 30);
             save.Click += delegate { Save(); };
-            Button close = MakeButton("Fermer", 414, 298, 74, 30);
+            Button close = MakeButton(Lang.T("Fermer", "Close"), 414, 298, 74, 30);
             close.Click += delegate { Close(); };
             CancelButton = close;
 
@@ -1019,8 +1260,9 @@ namespace PaletteTaskBar
 
         void AddPalette()
         {
-            string name = "Nouvelle palette";
-            for (int n = 2; NameTaken(name, null); n++) name = "Nouvelle palette " + n;
+            string baseName = Lang.T("Nouvelle palette", "New palette");
+            string name = baseName;
+            for (int n = 2; NameTaken(name, null); n++) name = baseName + " " + n;
             EditPal p = new EditPal();
             p.Name = name;
             pals.Add(p);
@@ -1037,11 +1279,12 @@ namespace PaletteTaskBar
             if (p == null) return;
             if (pals.Count <= 1)
             {
-                MessageBox.Show(this, "Il faut garder au moins une palette.", Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, Lang.T("Il faut garder au moins une palette.", "You need to keep at least one palette."),
+                    Text, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            if (MessageBox.Show(this, "Supprimer la palette « " + p.Name + " » ?", Text,
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show(this, Lang.T("Supprimer la palette « " + p.Name + " » ?", "Delete the palette “" + p.Name + "”?"),
+                    Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             int index = list.SelectedIndex;
             pals.Remove(p);
             list.Items.Remove(p);
@@ -1062,8 +1305,9 @@ namespace PaletteTaskBar
             foreach (EditPal ep in pals)
             {
                 string name = (ep.Name ?? "").Trim();
-                if (name.Length == 0) return Refuse(ep, -1, "Donne un nom à cette palette.");
-                if (NameTaken(name, ep)) return Refuse(ep, -1, "Deux palettes s'appellent « " + name + " ».");
+                if (name.Length == 0) return Refuse(ep, -1, Lang.T("Donnez un nom à cette palette.", "Give this palette a name."));
+                if (NameTaken(name, ep))
+                    return Refuse(ep, -1, Lang.T("Deux palettes s'appellent « " + name + " ».", "Two palettes are named “" + name + "”."));
 
                 Palette p = new Palette();
                 p.name = name;
@@ -1073,7 +1317,9 @@ namespace PaletteTaskBar
                     string raw = (ep.Slots[i] ?? "").Trim();
                     if (raw.Length == 0) continue;
                     string hex = Hex.Normalize(raw);
-                    if (hex == null) return Refuse(ep, i, "« " + raw + " » n'est pas un code couleur valide (exemple : #f5c518).");
+                    if (hex == null)
+                        return Refuse(ep, i, Lang.T("« " + raw + " » n'est pas un code couleur valide (exemple : #f5c518).",
+                                                    "“" + raw + "” is not a valid color code (example: #f5c518)."));
                     p.colors.Add(hex);
                 }
                 result.Add(p);
@@ -1111,7 +1357,7 @@ namespace PaletteTaskBar
         {
             if (dirty && e.CloseReason == CloseReason.UserClosing)
             {
-                DialogResult r = MessageBox.Show(this, "Enregistrer les modifications ?", Text,
+                DialogResult r = MessageBox.Show(this, Lang.T("Enregistrer les modifications ?", "Save your changes?"), Text,
                     MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
                 if (r == DialogResult.Cancel || (r == DialogResult.Yes && !Save())) e.Cancel = true;
             }
