@@ -3,3 +3,8 @@
 
 # Palettes personnelles (anciennes versions, rangées à côté de l'exe)
 palettes.json
+
+# Visuels : seules les images du README sont publiées, les sources restent sur le PC
+visuels/*
+!visuels/banner.png
+!visuels/demo.gif

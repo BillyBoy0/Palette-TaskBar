@@ -1,7 +1,11 @@
 # Palette-TaskBar
 
+![Palette-TaskBar : vos couleurs à côté de l'horloge de Windows / your colors next to the Windows clock](visuels/banner.png)
+
 Vos palettes de couleurs dans la barre des tâches de Windows 11 : un clic sur un rond copie son code hexadécimal.
 *Your color palettes in the Windows 11 taskbar: click a dot to copy its hex code.*
+
+![Démo : clic sur un rond, collage du code, changement de palette / Demo: click a dot, paste the hex, switch palettes](visuels/demo.gif)
 
 [Français](#français) · [English](#english)
 
